@@ -129,6 +129,7 @@ ComputerGraphicsApplication::ComputerGraphicsApplication() {
   createLogicalDevice();
   createSwapChain();
   createImageViews();
+  createGraphicsPipeline();
 }
 
 ComputerGraphicsApplication::~ComputerGraphicsApplication() {
@@ -307,5 +308,9 @@ void ComputerGraphicsApplication::createImageViews() {
       throw std::runtime_error("failed to create image views!");
     }
   }
+}
+
+void ComputerGraphicsApplication::createGraphicsPipeline() {
+
 }
 } // namespace cg

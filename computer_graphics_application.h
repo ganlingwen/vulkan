@@ -30,6 +30,7 @@ class ComputerGraphicsApplication {
   void createLogicalDevice();
   void createSwapChain();
   void createImageViews();
+  void createGraphicsPipeline();
 
   GLFWwindow* window_;
   VkInstance instance_;
