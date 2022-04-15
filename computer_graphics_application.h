@@ -30,7 +30,15 @@ class ComputerGraphicsApplication {
   void createLogicalDevice();
   void createSwapChain();
   void createImageViews();
+  void createRenderPass();
   void createGraphicsPipeline();
+  void createFramebuffers();
+  
+  void createCommandPool();
+  void createCommandBuffer();
+  void recordCommandBuffer(VkCommandBuffer command_buffer, uint32_t image_index);
+  void createSyncObjects();
+  void drawFrame();
 
   GLFWwindow* window_;
   VkInstance instance_;
@@ -45,5 +53,15 @@ class ComputerGraphicsApplication {
   VkFormat format_;
   VkExtent2D swapchain_extent_;
   std::vector<VkImageView> swapchain_image_views_;
+  VkRenderPass render_pass_;
+  VkPipelineLayout pipeline_layout_;
+  VkPipeline graphics_pipeline_;
+  std::vector<VkFramebuffer> swapchain_frame_buffers_;
+
+  VkCommandPool command_pool_;
+  VkCommandBuffer command_buffer_;
+  VkSemaphore image_available_semaphore_;
+  VkSemaphore render_finished_semaphore_;
+  VkFence in_flight_fence_;
 };
 } // namespace cg

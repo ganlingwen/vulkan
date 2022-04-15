@@ -10,8 +10,7 @@ find_package(glfw3 REQUIRED)
 add_library(computer_graphics_application
   computer_graphics_application.cpp)
 target_link_libraries(computer_graphics_application PUBLIC
-  Vulkan::Vulkan
-  glfw
+  shader_utils
 )
 
 
@@ -19,3 +18,6 @@ add_executable(run_computer_graphics main.cpp)
 target_link_libraries(run_computer_graphics PUBLIC
   computer_graphics_application
 )
+
+
+add_subdirectory(shader)
