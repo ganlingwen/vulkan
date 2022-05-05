@@ -23,9 +23,6 @@ class ComputerGraphicsApplication {
   void run();
 
  private:
-  void initWindow();
-  void initVulkan();
-  void createSurface();
   void pickPhysicalDevice();
   void createLogicalDevice();
   void createSwapChain();

@@ -13,6 +13,59 @@ namespace {
 constexpr uint32_t kWidth = 800;
 constexpr uint32_t kHeight = 600;
 
+GLFWwindow* initWindow() {
+  glfwInit();
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+  return glfwCreateWindow(kWidth, kHeight, "Vulkan", nullptr, nullptr);
+}
+}  // namespace
+
+namespace {
+VkApplicationInfo getApplicationInfo() {
+  VkApplicationInfo info{};
+  info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+  info.pApplicationName = "Computer Graphics";
+  info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+  info.pEngineName = "SweetHome Engine";
+  info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+  info.apiVersion = VK_API_VERSION_1_0;
+  return info;
+}
+
+VkInstanceCreateInfo getInstanceCreateInfo(VkApplicationInfo* application_info) {
+  VkInstanceCreateInfo info{};
+  info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+  info.pApplicationInfo = application_info;
+  uint32_t extension_count = 0;
+  const char** extensions = glfwGetRequiredInstanceExtensions(&extension_count);
+  info.enabledExtensionCount = extension_count;
+  info.ppEnabledExtensionNames = extensions;
+  info.enabledLayerCount = 0;
+  return info;
+}
+
+VkInstance initVulkan() {
+  VkApplicationInfo application_info = getApplicationInfo();
+  VkInstanceCreateInfo create_info = getInstanceCreateInfo(&application_info);
+  VkInstance instance;
+  if (vkCreateInstance(&create_info, nullptr, &instance) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create instance!");
+  }
+  return instance;
+}
+
+VkSurfaceKHR createSurface(VkInstance instance, GLFWwindow* window) {
+  VkSurfaceKHR surface;
+  if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create window surface!");
+  }
+  return surface;
+}
+
+}  // namespace
+
+namespace {
 const std::vector<const char*> device_extensions = {
   VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
@@ -124,9 +177,9 @@ VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
 } // namespace
 
 ComputerGraphicsApplication::ComputerGraphicsApplication() {
-  initWindow();
-  initVulkan();
-  createSurface();
+  window_ = initWindow();
+  instance_ = initVulkan();
+  surface_ = createSurface(instance_, window_);
   pickPhysicalDevice();
   createLogicalDevice();
   createSwapChain();
@@ -166,42 +219,7 @@ void ComputerGraphicsApplication::run() {
     glfwPollEvents();
     drawFrame();
   }
-}
-
-void ComputerGraphicsApplication::initWindow() {
-  glfwInit();
-  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  window_ = glfwCreateWindow(kWidth, kHeight, "Vulkan", nullptr, nullptr);
-}
-
-void ComputerGraphicsApplication::initVulkan() {
-  VkApplicationInfo app_info{};
-  app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  app_info.pApplicationName = "Computer Graphics";
-  app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-  app_info.pEngineName = "SweetHome Engine";
-  app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-  app_info.apiVersion = VK_API_VERSION_1_0;
-
-  VkInstanceCreateInfo create_info{};
-  create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-  create_info.pApplicationInfo = &app_info;
-  uint32_t extension_count = 0;
-  const char** extensions = glfwGetRequiredInstanceExtensions(&extension_count);
-  create_info.enabledExtensionCount = extension_count;
-  create_info.ppEnabledExtensionNames = extensions;
-  create_info.enabledLayerCount = 0;
-
-  if (vkCreateInstance(&create_info, nullptr, &instance_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create instance!");
-  }
-}
-
-void ComputerGraphicsApplication::createSurface() {
-  if (glfwCreateWindowSurface(instance_, window_, nullptr, &surface_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create window surface!");
-  }
+  vkDeviceWaitIdle(device_);
 }
 
 void ComputerGraphicsApplication::pickPhysicalDevice() {
@@ -348,12 +366,22 @@ void ComputerGraphicsApplication::createRenderPass() {
   subpass.colorAttachmentCount = 1;
   subpass.pColorAttachments = &color_attachment_ref;
 
+  VkSubpassDependency dependency{};
+  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+  dependency.dstSubpass = 0;
+  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependency.srcAccessMask = 0;
+  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
   VkRenderPassCreateInfo render_pass_info{};
   render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
   render_pass_info.attachmentCount = 1;
   render_pass_info.pAttachments = &color_attachment;
   render_pass_info.subpassCount = 1;
   render_pass_info.pSubpasses = &subpass;
+  render_pass_info.dependencyCount = 1;
+  render_pass_info.pDependencies = &dependency;
 
   if (vkCreateRenderPass(device_, &render_pass_info, nullptr, &render_pass_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create render pass!");
@@ -361,8 +389,8 @@ void ComputerGraphicsApplication::createRenderPass() {
 }
 
 void ComputerGraphicsApplication::createGraphicsPipeline() {
-  const auto vert_shader = readFile("/Users/sweethome/Documents/experimental/cg/shader/vert.spv");
-  const auto frag_shader = readFile("/Users/sweethome/Documents/experimental/cg/shader/frag.spv");
+  const auto vert_shader = readFile("/Users/sweethome/Documents/experimental/vulkan/shader/vert.spv");
+  const auto frag_shader = readFile("/Users/sweethome/Documents/experimental/vulkan/shader/frag.spv");
   VkShaderModule vert_shader_module = createShaderModule(vert_shader, device_);
   VkShaderModule frag_shader_module = createShaderModule(frag_shader, device_);
 
@@ -574,6 +602,7 @@ void ComputerGraphicsApplication::createSyncObjects() {
   semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
   VkFenceCreateInfo fence_info{};
   fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
   if (vkCreateSemaphore(device_, &semaphore_info, nullptr,
         &image_available_semaphore_) != VK_SUCCESS ||
       vkCreateSemaphore(device_, &semaphore_info, nullptr,
@@ -585,6 +614,43 @@ void ComputerGraphicsApplication::createSyncObjects() {
 }
 
 void ComputerGraphicsApplication::drawFrame() {
-  
+  vkWaitForFences(device_, 1, &in_flight_fence_, VK_TRUE, UINT64_MAX);
+  vkResetFences(device_, 1, &in_flight_fence_);
+
+  uint32_t image_index;
+  vkAcquireNextImageKHR(device_, swap_chain_, UINT64_MAX,
+      image_available_semaphore_, VK_NULL_HANDLE, &image_index);
+
+  vkResetCommandBuffer(command_buffer_, 0);
+  recordCommandBuffer(command_buffer_, image_index);
+
+  VkSubmitInfo submit_info{};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  VkSemaphore wait_semaphores[] = {image_available_semaphore_};
+  VkPipelineStageFlags wait_stages[] = {
+    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  submit_info.waitSemaphoreCount = 1;
+  submit_info.pWaitSemaphores = wait_semaphores;
+  submit_info.pWaitDstStageMask = wait_stages;
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &command_buffer_;
+  VkSemaphore signal_semaphores[] = {
+      render_finished_semaphore_};
+  submit_info.signalSemaphoreCount = 1;
+  submit_info.pSignalSemaphores = signal_semaphores;
+  if (vkQueueSubmit(graphics_queue_, 1, &submit_info, in_flight_fence_) != VK_SUCCESS) {
+    throw std::runtime_error("failed to submit draw command buffer!");
+  }
+
+  VkPresentInfoKHR present_info{};
+  present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  present_info.waitSemaphoreCount = 1;
+  present_info.pWaitSemaphores = signal_semaphores;
+  VkSwapchainKHR swapchains[] = {swap_chain_};
+  present_info.swapchainCount = 1;
+  present_info.pSwapchains = swapchains;
+  present_info.pImageIndices = &image_index;
+  present_info.pResults = nullptr;
+  vkQueuePresentKHR(present_queue_, &present_info);
 }
 } // namespace cg
