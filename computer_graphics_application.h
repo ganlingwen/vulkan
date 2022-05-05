@@ -15,48 +15,65 @@ struct QueueFamilyIndices {
   }
 };
 
+struct PhysicalDevice {
+  VkPhysicalDevice device = VK_NULL_HANDLE;
+  QueueFamilyIndices indices;
+};
+
+struct LogicalDevice {
+  VkDevice device;
+  VkQueue graphics;
+  VkQueue present;
+
+  void destroy() {}
+};
+
+struct Swapchain {
+  VkSwapchainKHR chain;
+  VkFormat format;
+  VkExtent2D extent;
+
+  std::vector<VkImage> images;
+  std::vector<VkImageView> views;
+  std::vector<VkFramebuffer> buffers;
+
+  void destroy(const VkDevice &device) {
+    for (auto framebuffer : buffers) {
+      vkDestroyFramebuffer(device, framebuffer, nullptr);
+    }
+    for (auto view : views) {
+      vkDestroyImageView(device, view, nullptr);
+    }
+    vkDestroySwapchainKHR(device, chain, nullptr);
+  }
+};
+
 class ComputerGraphicsApplication {
- public:
+public:
   ComputerGraphicsApplication();
   ~ComputerGraphicsApplication();
 
   void run();
 
- private:
-  void pickPhysicalDevice();
-  void createLogicalDevice();
-  void createSwapChain();
-  void createImageViews();
-  void createRenderPass();
-  void createGraphicsPipeline();
-  void createFramebuffers();
-  
-  void createCommandPool();
-  void createCommandBuffer();
-  void recordCommandBuffer(VkCommandBuffer command_buffer, uint32_t image_index);
-  void createSyncObjects();
+private:
   void drawFrame();
+  void recordCommandBuffer(VkCommandBuffer command_buffer,
+                           uint32_t image_index);
 
-  GLFWwindow* window_;
+  GLFWwindow *window_;
   VkInstance instance_;
   VkSurfaceKHR surface_;
-  VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
-  QueueFamilyIndices indices_;
-  VkDevice device_;
-  VkQueue graphics_queue_;
-  VkQueue present_queue_;
-  VkSwapchainKHR swap_chain_;
-  std::vector<VkImage> swapchain_images_;
-  VkFormat format_;
-  VkExtent2D swapchain_extent_;
-  std::vector<VkImageView> swapchain_image_views_;
+
+  PhysicalDevice physical_;
+  LogicalDevice logical_;
+  Swapchain swapchain_;
+
   VkRenderPass render_pass_;
   VkPipelineLayout pipeline_layout_;
   VkPipeline graphics_pipeline_;
-  std::vector<VkFramebuffer> swapchain_frame_buffers_;
-
   VkCommandPool command_pool_;
   VkCommandBuffer command_buffer_;
+
   VkSemaphore image_available_semaphore_;
   VkSemaphore render_finished_semaphore_;
   VkFence in_flight_fence_;
